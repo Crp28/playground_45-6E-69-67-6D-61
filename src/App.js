@@ -65,40 +65,22 @@ function App() {
         if (pos && pos.x === row && pos.y === col) {
           if (!pendingDamage[p.id] || pendingDamage[p.id].type !== 'attack') {
             addShowCard({ type: 'event', content: `医生自动袭击病患（${p.name}），判定中...` });
-            if (!allowSidePanel) {
-              showDiceModal(1, (results) => {
-                let amount = 1;
-                if (results[0] === 6) amount = 2;
-                if (results[0] === 1) amount = 0;
-                if (amount > 0) {
-                  setPlayerStats(stats => {
-                    const s = { ...stats[p.id] };
-                    s.pain = Math.max(0, s.pain - amount);
-                    return { ...stats, [p.id]: s };
-                  });
-                  addShowCard({ type: 'event', content: `医生袭击判定结果：${results[0]}，${p.name}直接受到${amount}点疼痛伤害` });
-                } else {
-                  addShowCard({ type: 'event', content: `医生袭击判定结果：${results[0]}，${p.name}未受伤害` });
-                }
-              });
-            } else {
-              // 并列显示时，直接追加 attack 类型骰子控制器
-              showDiceModal(1, (results) => {
-                let amount = 1;
-                if (results[0] === 6) amount = 2;
-                if (results[0] === 1) amount = 0;
-                if (amount > 0) {
-                  setPlayerStats(stats => {
-                    const s = { ...stats[p.id] };
-                    s.pain = Math.max(0, s.pain - amount);
-                    return { ...stats, [p.id]: s };
-                  });
-                  addShowCard({ type: 'event', content: `医生袭击判定结果：${results[0]}，${p.name}直接受到${amount}点疼痛伤害` });
-                } else {
-                  addShowCard({ type: 'event', content: `医生袭击判定结果：${results[0]}，${p.name}未受伤害` });
-                }
-              }, 'attack');
-            }
+            // 统一所有骰子类型为'attack'
+            showDiceModal(1, (results) => {
+              let amount = 1;
+              if (results[0] === 6) amount = 2;
+              if (results[0] === 1) amount = 0;
+              if (amount > 0) {
+                setPlayerStats(stats => {
+                  const s = { ...stats[p.id] };
+                  s.pain = Math.max(0, s.pain - amount);
+                  return { ...stats, [p.id]: s };
+                });
+                addShowCard({ type: 'event', content: `医生袭击判定结果：${results[0]}，${p.name}直接受到${amount}点疼痛伤害` });
+              } else {
+                addShowCard({ type: 'event', content: `医生袭击判定结果：${results[0]}，${p.name}未受伤害` });
+              }
+            }, 'attack');
           }
         }
       }
@@ -300,7 +282,6 @@ function App() {
       } else if (cardType === '尸体') {
         cell.marks.push({ type: 'corpse' });
         if (player.role === ROLES.DOCTOR) {
-          addShowCard({ type: 'item', content: '医生探索到尸体！本回合剩余步数+2' });
           setRemainingSteps(s => {
             if (s <= 0) {
               setMoving(true); // 步数归零时直接获得2步并继续行动
@@ -314,7 +295,6 @@ function App() {
       } else if (cardType === '意外') {
         cell.marks.push({ type: 'circle', color: player.color });
         if (player.role === ROLES.DOCTOR) {
-          addShowCard({ type: 'event', content: '医生遭遇意外，需判定！' });
           // 追加意外判定掷骰器
           setSidePanelContent(prev => {
             const arr = Array.isArray(prev) ? prev : (prev ? [prev] : []);
@@ -387,7 +367,6 @@ function App() {
           }
         });
         cell.marks.push({ type: 'circle', color: '#333' });
-        addShowCard({ type: 'explore', content: '探索到密室！本格四边全部生成暗道（覆盖墙体，自动去重）。' });
       } else {
         cell.marks.push({ type: 'circle', color: player.color });
       }
@@ -577,9 +556,11 @@ function App() {
 
   // 点击棋盘格进行移动（移动后探索新格子）
   const handleCellClick = (row, col) => {
-    if (!gameStarted || !moving || exploreEdgeModal) return;
+    if (!gameStarted || !moving || exploreEdgeModal || diceModals.length > 0) return;
     const movable = getMovableCells();
     if (!movable.some(c => c.x === row && c.y === col)) return;
+    // 移动前清空信息栏
+    setShowCardList([]);
     const player = players[currentPlayerIdx];
     const pos = playerPositions[player.id];
     let moveDir = null;
@@ -852,7 +833,6 @@ function App() {
             disabled={modal.cardType === '墙体' ? disableWallBtn('S') : disableSecretBtn('S')}
           >↓</button>
         </div>
-        <button style={{ fontSize: 15, padding: '6px 18px', marginTop: 8 }} onClick={() => closePanelType('edge')}>关闭</button>
       </div>
     );
   }
@@ -1394,7 +1374,7 @@ function App() {
               transform: 'translateX(-50%)',
               background: '#fff',
               borderRadius: 8,
-              boxShadow: '0 2px 8px #aaa',
+              boxShadow: '0  2px 8px #aaa',
               padding: '12px 32px',
               fontSize: 16,
               color: '#4A90E2',
@@ -1408,5 +1388,3 @@ function App() {
 }
 
 export default App;
-
-
