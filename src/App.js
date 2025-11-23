@@ -38,6 +38,7 @@ function App() {
   const [players, setPlayers] = useState([]);
   const [joinLoading, setJoinLoading] = useState(false);
   const [joinError, setJoinError] = useState('');
+  const [availableRooms, setAvailableRooms] = useState([]);
 
   // Load saved token on mount
   useEffect(() => {
@@ -51,9 +52,33 @@ function App() {
     }
   }, []);
 
+  // Fetch available rooms
+  const fetchAvailableRooms = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/rooms`);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableRooms(data.rooms || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch rooms:', error);
+    }
+  };
+
+  // Fetch rooms when not in room
+  useEffect(() => {
+    if (!inRoom) {
+      fetchAvailableRooms();
+      // Poll for new rooms every 5 seconds
+      const interval = setInterval(fetchAvailableRooms, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [inRoom]);
+
   // Join room
-  const handleJoinRoom = async () => {
-    if (!roomCode.trim()) {
+  const handleJoinRoom = async (codeOverride, createIfNotExists = false) => {
+    const code = codeOverride || roomCode;
+    if (!code.trim()) {
       setJoinError('请输入房间码');
       return;
     }
@@ -66,12 +91,13 @@ function App() {
     setJoinError('');
 
     try {
-      const response = await fetch(`${API_BASE}/rooms/${roomCode.trim().toUpperCase()}/join`, {
+      const response = await fetch(`${API_BASE}/rooms/${code.trim().toUpperCase()}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: playerName.trim(),
           token: playerToken,
+          createIfNotExists: createIfNotExists,
         }),
       });
 
@@ -86,14 +112,47 @@ function App() {
       setIsHost(data.isHost);
       setPlayers(data.room.players);
       setInRoom(true);
+      setRoomCode(code.trim().toUpperCase());
 
       // Save to localStorage
       localStorage.setItem('playerToken', data.playerToken);
-      localStorage.setItem('roomCode', roomCode.trim().toUpperCase());
+      localStorage.setItem('roomCode', code.trim().toUpperCase());
     } catch (error) {
       setJoinError(error.message);
     } finally {
       setJoinLoading(false);
+    }
+  };
+
+  // Leave room
+  const handleLeaveRoom = async () => {
+    if (!playerToken || !roomCode) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/rooms/${roomCode}/leave`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: playerToken }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || '离开房间失败');
+      }
+
+      // Clear room state
+      setInRoom(false);
+      setPlayers([]);
+      setIsHost(false);
+      setControlledPlayerId(null);
+      setRoomCode('');
+      
+      // Clear localStorage
+      localStorage.removeItem('playerToken');
+      localStorage.removeItem('roomCode');
+      setPlayerToken(null);
+    } catch (error) {
+      alert(error.message);
     }
   };
 
@@ -216,6 +275,7 @@ function App() {
         onPlayerNameChange={setPlayerName}
         inRoom={inRoom}
         onJoinRoom={handleJoinRoom}
+        onLeaveRoom={handleLeaveRoom}
         joinDisabled={!roomCode.trim() || !playerName.trim() || joinLoading}
         joinError={joinError}
         joinLoading={joinLoading}
@@ -230,6 +290,8 @@ function App() {
         canStartGame={canStartGame}
         isHost={isHost}
         controlledPlayerId={controlledPlayerId}
+        availableRooms={availableRooms}
+        onCreateRoom={handleJoinRoom}
       />
     );
   }
