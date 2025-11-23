@@ -1,6 +1,8 @@
 import React from 'react';
 import DoctorListButton from './DoctorListButton';
 import DoctorCardPopup from './DoctorCardPopup';
+import Popup from './Popup';
+import RoomCard from './RoomCard';
 
 function Lobby({
   roomCode,
@@ -23,6 +25,8 @@ function Lobby({
   canStartGame,
   isHost,
   controlledPlayerId,
+  availableRooms,
+  onCreateRoom,
 }) {
   const doctorPlayers = React.useMemo(
     () => players.filter((player) => player.role === roles.DOCTOR),
@@ -41,6 +45,46 @@ function Lobby({
   const canChooseDoctorCard = controlledPlayer && controlledPlayer.role === roles.DOCTOR;
 
   const [showDoctorCards, setShowDoctorCards] = React.useState(false);
+  const [showCreatePopup, setShowCreatePopup] = React.useState(false);
+  const [showJoinPopup, setShowJoinPopup] = React.useState(false);
+  const [showJoinConfirmPopup, setShowJoinConfirmPopup] = React.useState(false);
+  const [selectedRoom, setSelectedRoom] = React.useState(null);
+  const [createRoomCode, setCreateRoomCode] = React.useState('');
+  const [joinRoomCode, setJoinRoomCode] = React.useState('');
+
+  const handleCreateRoom = () => {
+    if (createRoomCode.trim()) {
+      const upperRoomCode = createRoomCode.trim().toUpperCase();
+      setShowCreatePopup(false);
+      setCreateRoomCode('');
+      // Call join with the room code
+      onJoinRoom(upperRoomCode);
+    }
+  };
+
+  const handleJoinRoom = () => {
+    if (joinRoomCode.trim()) {
+      const upperRoomCode = joinRoomCode.trim().toUpperCase();
+      setShowJoinPopup(false);
+      setJoinRoomCode('');
+      // Call join with the room code
+      onJoinRoom(upperRoomCode);
+    }
+  };
+
+  const handleRoomCardClick = (room) => {
+    setSelectedRoom(room);
+    setShowJoinConfirmPopup(true);
+  };
+
+  const handleConfirmJoinRoom = () => {
+    if (selectedRoom) {
+      setShowJoinConfirmPopup(false);
+      const code = selectedRoom.code;
+      setSelectedRoom(null);
+      onJoinRoom(code);
+    }
+  };
 
   if (!inRoom) {
     return (
@@ -49,26 +93,15 @@ function Lobby({
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
           padding: '48px 16px',
           fontFamily: 'sans-serif',
+          maxWidth: 960,
+          margin: '0 auto',
         }}
       >
-        <h2 style={{ marginBottom: 24 }}>加入游戏房间</h2>
-        <input
-          type="text"
-          placeholder="输入房间码"
-          value={roomCode}
-          onChange={(e) => onRoomCodeChange(e.target.value)}
-          style={{
-            padding: '10px 12px',
-            fontSize: 16,
-            width: 240,
-            borderRadius: 6,
-            border: '1px solid #ccc',
-            marginBottom: 12,
-          }}
-        />
+        <h2 style={{ marginBottom: 32 }}>游戏大厅</h2>
+        
+        {/* Player name input */}
         <input
           type="text"
           placeholder="输入昵称"
@@ -77,29 +110,255 @@ function Lobby({
           style={{
             padding: '10px 12px',
             fontSize: 16,
-            width: 240,
+            width: 300,
             borderRadius: 6,
             border: '1px solid #ccc',
-            marginBottom: 18,
+            marginBottom: 24,
           }}
         />
-        {joinError && <div style={{ color: '#E94E77', marginBottom: 12 }}>{joinError}</div>}
-        <button
-          onClick={onJoinRoom}
-          disabled={joinDisabled}
-          style={{
-            padding: '10px 32px',
-            fontSize: 16,
-            borderRadius: 6,
-            border: 'none',
-            background: joinDisabled ? '#ccc' : '#4A90E2',
-            color: '#fff',
-            cursor: joinDisabled ? 'not-allowed' : 'pointer',
-            opacity: joinLoading ? 0.8 : 1,
-          }}
+
+        {/* Create Room and Join Room buttons */}
+        <div style={{ display: 'flex', gap: 16, marginBottom: 32 }}>
+          <button
+            onClick={() => setShowCreatePopup(true)}
+            disabled={!playerName.trim()}
+            style={{
+              padding: '12px 32px',
+              fontSize: 16,
+              borderRadius: 6,
+              border: 'none',
+              background: playerName.trim() ? '#4A90E2' : '#ccc',
+              color: '#fff',
+              cursor: playerName.trim() ? 'pointer' : 'not-allowed',
+              fontWeight: 'bold',
+            }}
+          >
+            创建房间
+          </button>
+          <button
+            onClick={() => setShowJoinPopup(true)}
+            disabled={!playerName.trim()}
+            style={{
+              padding: '12px 32px',
+              fontSize: 16,
+              borderRadius: 6,
+              border: 'none',
+              background: playerName.trim() ? '#E94E77' : '#ccc',
+              color: '#fff',
+              cursor: playerName.trim() ? 'pointer' : 'not-allowed',
+              fontWeight: 'bold',
+            }}
+          >
+            加入房间
+          </button>
+        </div>
+
+        {joinError && (
+          <div style={{ color: '#E94E77', marginBottom: 16 }}>{joinError}</div>
+        )}
+
+        {/* Available rooms section */}
+        <div style={{ width: '100%', maxWidth: 800 }}>
+          <h3 style={{ marginBottom: 16, color: '#333' }}>可用房间</h3>
+          {availableRooms && availableRooms.length > 0 ? (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 16,
+              }}
+            >
+              {availableRooms.map((room) => (
+                <RoomCard
+                  key={room.code}
+                  room={room}
+                  onClick={() => handleRoomCardClick(room)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: 32,
+                color: '#999',
+                border: '1px dashed #ccc',
+                borderRadius: 8,
+              }}
+            >
+              暂无可用房间
+            </div>
+          )}
+        </div>
+
+        {/* Create Room Popup */}
+        <Popup
+          isOpen={showCreatePopup}
+          onClose={() => setShowCreatePopup(false)}
+          title="创建房间"
         >
-          {joinLoading ? '加入中...' : '加入'}
-        </button>
+          <input
+            type="text"
+            placeholder="输入房间码"
+            value={createRoomCode}
+            onChange={(e) => setCreateRoomCode(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') handleCreateRoom();
+            }}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              fontSize: 16,
+              borderRadius: 6,
+              border: '1px solid #ccc',
+              marginBottom: 16,
+            }}
+            autoFocus
+          />
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setShowCreatePopup(false)}
+              style={{
+                padding: '8px 16px',
+                fontSize: 14,
+                borderRadius: 6,
+                border: '1px solid #ccc',
+                background: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              取消
+            </button>
+            <button
+              onClick={handleCreateRoom}
+              disabled={!createRoomCode.trim() || joinLoading}
+              style={{
+                padding: '8px 16px',
+                fontSize: 14,
+                borderRadius: 6,
+                border: 'none',
+                background: createRoomCode.trim() && !joinLoading ? '#4A90E2' : '#ccc',
+                color: '#fff',
+                cursor: createRoomCode.trim() && !joinLoading ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {joinLoading ? '创建中...' : '创建'}
+            </button>
+          </div>
+        </Popup>
+
+        {/* Join Room Popup */}
+        <Popup
+          isOpen={showJoinPopup}
+          onClose={() => setShowJoinPopup(false)}
+          title="加入房间"
+        >
+          <input
+            type="text"
+            placeholder="输入房间码"
+            value={joinRoomCode}
+            onChange={(e) => setJoinRoomCode(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') handleJoinRoom();
+            }}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              fontSize: 16,
+              borderRadius: 6,
+              border: '1px solid #ccc',
+              marginBottom: 16,
+            }}
+            autoFocus
+          />
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setShowJoinPopup(false)}
+              style={{
+                padding: '8px 16px',
+                fontSize: 14,
+                borderRadius: 6,
+                border: '1px solid #ccc',
+                background: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              取消
+            </button>
+            <button
+              onClick={handleJoinRoom}
+              disabled={!joinRoomCode.trim() || joinLoading}
+              style={{
+                padding: '8px 16px',
+                fontSize: 14,
+                borderRadius: 6,
+                border: 'none',
+                background: joinRoomCode.trim() && !joinLoading ? '#E94E77' : '#ccc',
+                color: '#fff',
+                cursor: joinRoomCode.trim() && !joinLoading ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {joinLoading ? '加入中...' : '加入'}
+            </button>
+          </div>
+        </Popup>
+
+        {/* Join Confirmation Popup */}
+        <Popup
+          isOpen={showJoinConfirmPopup}
+          onClose={() => {
+            setShowJoinConfirmPopup(false);
+            setSelectedRoom(null);
+          }}
+          title="加入房间"
+        >
+          {selectedRoom && (
+            <div>
+              <p style={{ marginBottom: 16 }}>
+                确定要加入房间 <strong>{selectedRoom.code}</strong> 吗？
+              </p>
+              <div style={{ marginBottom: 16, color: '#666', fontSize: 14 }}>
+                <div>房主：{selectedRoom.hostName}</div>
+                <div>
+                  玩家：{selectedRoom.currentPlayers}/{selectedRoom.totalPositions}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => {
+                    setShowJoinConfirmPopup(false);
+                    setSelectedRoom(null);
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: 14,
+                    borderRadius: 6,
+                    border: '1px solid #ccc',
+                    background: '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleConfirmJoinRoom}
+                  disabled={joinLoading}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: 14,
+                    borderRadius: 6,
+                    border: 'none',
+                    background: joinLoading ? '#ccc' : '#4A90E2',
+                    color: '#fff',
+                    cursor: joinLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {joinLoading ? '加入中...' : '确定'}
+                </button>
+              </div>
+            </div>
+          )}
+        </Popup>
       </div>
     );
   }

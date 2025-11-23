@@ -78,6 +78,47 @@ const serializeRoom = (room) => ({
   })),
 });
 
+const serializeRoomSummary = (room) => {
+  const hostPlayer = room.players.find((p) => p.controllerId === room.hostControllerId);
+  const occupiedCount = room.players.filter((p) => p.controllerId).length;
+  const totalPositions = room.players.length;
+  
+  return {
+    code: room.code,
+    hostName: hostPlayer?.name || '未知',
+    currentPlayers: occupiedCount,
+    totalPositions: totalPositions,
+    createdAt: room.createdAt,
+  };
+};
+
+const transferHost = (room) => {
+  // Find the next occupied player to become host
+  const nextHost = room.players.find((p) => p.controllerId && p.controllerId !== room.hostControllerId);
+  if (nextHost) {
+    room.hostControllerId = nextHost.controllerId;
+    room.hostPlayerId = nextHost.id;
+  }
+};
+
+const removePlayerFromRoom = (room, token) => {
+  const player = findPlayerByController(room, token);
+  if (player) {
+    player.controllerId = null;
+    player.name = `玩家${player.id}`;
+    
+    // If this was the host, transfer to another player
+    if (token === room.hostControllerId) {
+      transferHost(room);
+    }
+    
+    // Check if room is now empty
+    const hasPlayers = room.players.some((p) => p.controllerId);
+    return !hasPlayers;
+  }
+  return false;
+};
+
 const findPlayerByController = (room, token) => room.players.find((p) => p.controllerId === token);
 
 const assertHost = (room, token) => {
@@ -217,6 +258,46 @@ app.post(`${API_PREFIX}/rooms/:code/doctor-card`, (req, res, next) => {
     if (!card) return res.status(400).json({ message: '无效卡牌' });
     player.doctorCard = card;
     res.json({ room: serializeRoom(room) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Get list of all rooms
+app.get(`${API_PREFIX}/rooms`, (req, res, next) => {
+  try {
+    const roomList = Array.from(rooms.values())
+      .filter((room) => {
+        // Only include rooms that have at least one player
+        return room.players.some((p) => p.controllerId);
+      })
+      .map(serializeRoomSummary)
+      .sort((a, b) => b.createdAt - a.createdAt); // Most recent first
+    
+    res.json({ rooms: roomList });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Leave room
+app.post(`${API_PREFIX}/rooms/:code/leave`, (req, res, next) => {
+  try {
+    const code = req.params.code.trim().toUpperCase();
+    const { token } = req.body || {};
+    const room = getRoom(code);
+    if (!room) return res.status(404).json({ message: '房间不存在' });
+    if (!token) return res.status(403).json({ message: '未授权' });
+    
+    const isEmpty = removePlayerFromRoom(room, token);
+    
+    // If room is empty, delete it
+    if (isEmpty) {
+      rooms.delete(code);
+      return res.json({ message: '已离开房间，房间已关闭' });
+    }
+    
+    res.json({ message: '已离开房间', room: serializeRoom(room) });
   } catch (err) {
     next(err);
   }
