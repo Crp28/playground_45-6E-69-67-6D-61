@@ -132,8 +132,14 @@ const assertHost = (room, token) => {
 app.post(`${API_PREFIX}/rooms/:code/join`, (req, res, next) => {
   try {
     const code = req.params.code.trim().toUpperCase();
-    const { name, token } = req.body || {};
+    const { name, token, createIfNotExists } = req.body || {};
     let room = getRoom(code);
+    
+    // If room doesn't exist and createIfNotExists is not true, return error
+    if (!room && !createIfNotExists) {
+      return res.status(404).json({ message: '房间不存在' });
+    }
+    
     if (!room) {
       room = ensureRoom(code);
     }

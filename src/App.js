@@ -76,7 +76,7 @@ function App() {
   }, [inRoom]);
 
   // Join room
-  const handleJoinRoom = async (codeOverride) => {
+  const handleJoinRoom = async (codeOverride, createIfNotExists = false) => {
     const code = codeOverride || roomCode;
     if (!code.trim()) {
       setJoinError('请输入房间码');
@@ -97,6 +97,7 @@ function App() {
         body: JSON.stringify({
           name: playerName.trim(),
           token: playerToken,
+          createIfNotExists: createIfNotExists,
         }),
       });
 
@@ -120,6 +121,38 @@ function App() {
       setJoinError(error.message);
     } finally {
       setJoinLoading(false);
+    }
+  };
+
+  // Leave room
+  const handleLeaveRoom = async () => {
+    if (!playerToken || !roomCode) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/rooms/${roomCode}/leave`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: playerToken }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || '离开房间失败');
+      }
+
+      // Clear room state
+      setInRoom(false);
+      setPlayers([]);
+      setIsHost(false);
+      setControlledPlayerId(null);
+      setRoomCode('');
+      
+      // Clear localStorage
+      localStorage.removeItem('playerToken');
+      localStorage.removeItem('roomCode');
+      setPlayerToken(null);
+    } catch (error) {
+      alert(error.message);
     }
   };
 
@@ -242,6 +275,7 @@ function App() {
         onPlayerNameChange={setPlayerName}
         inRoom={inRoom}
         onJoinRoom={handleJoinRoom}
+        onLeaveRoom={handleLeaveRoom}
         joinDisabled={!roomCode.trim() || !playerName.trim() || joinLoading}
         joinError={joinError}
         joinLoading={joinLoading}

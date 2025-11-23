@@ -11,6 +11,7 @@ function Lobby({
   onPlayerNameChange,
   inRoom,
   onJoinRoom,
+  onLeaveRoom,
   joinDisabled,
   joinError,
   joinLoading,
@@ -57,8 +58,8 @@ function Lobby({
       const upperRoomCode = createRoomCode.trim().toUpperCase();
       setShowCreatePopup(false);
       setCreateRoomCode('');
-      // Call join with the room code
-      onJoinRoom(upperRoomCode);
+      // Call join with createIfNotExists=true
+      onJoinRoom(upperRoomCode, true);
     }
   };
 
@@ -67,8 +68,8 @@ function Lobby({
       const upperRoomCode = joinRoomCode.trim().toUpperCase();
       setShowJoinPopup(false);
       setJoinRoomCode('');
-      // Call join with the room code
-      onJoinRoom(upperRoomCode);
+      // Call join with createIfNotExists=false (only join existing)
+      onJoinRoom(upperRoomCode, false);
     }
   };
 
@@ -82,7 +83,8 @@ function Lobby({
       setShowJoinConfirmPopup(false);
       const code = selectedRoom.code;
       setSelectedRoom(null);
-      onJoinRoom(code);
+      // Join existing room (createIfNotExists=false)
+      onJoinRoom(code, false);
     }
   };
 
@@ -378,9 +380,34 @@ function Lobby({
         onClose={() => setShowDoctorCards(false)}
         doctorCards={doctorCards}
       />
-      <header style={{ marginBottom: 32 }}>
-        <h2 style={{ marginBottom: 8 }}>房间：{roomCode}</h2>
-        <div style={{ color: '#777' }}>等待玩家加入并分配角色，准备开始游戏。</div>
+      <header style={{ marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h2 style={{ marginBottom: 8 }}>房间：{roomCode}</h2>
+          <div style={{ color: '#777' }}>等待玩家加入并分配角色，准备开始游戏。</div>
+        </div>
+        <button
+          onClick={onLeaveRoom}
+          style={{
+            padding: '10px 24px',
+            fontSize: 14,
+            borderRadius: 6,
+            border: '1px solid #D0021B',
+            background: '#fff',
+            color: '#D0021B',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#D0021B';
+            e.currentTarget.style.color = '#fff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#fff';
+            e.currentTarget.style.color = '#D0021B';
+          }}
+        >
+          离开房间
+        </button>
       </header>
 
       <section
